@@ -1,7 +1,7 @@
 import torch
-import torch.nn.functional as F 
-import numpy as np 
-import math 
+import torch.nn.functional as F
+import numpy as np
+import math
 from data import get_batch
 from pathlib import Path
 from gensim.models.fasttext import FastText as FT_gensim
@@ -11,9 +11,10 @@ from torch import nn, optim
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+
 class ETM(nn.Module):
-    def __init__(self, num_topics, vocab_size, t_hidden_size, rho_size, emsize, 
-                    theta_act, embeddings=None, train_embeddings=True, enc_drop=0.5):
+    def __init__(self, num_topics, vocab_size, t_hidden_size, rho_size, emsize,
+                 theta_act, embeddings=None, train_embeddings=True, enc_drop=0.5):
         super(ETM, self).__init__()
 
         ## define hyperparameters
@@ -26,7 +27,7 @@ class ETM(nn.Module):
         self.t_drop = nn.Dropout(enc_drop)
 
         self.theta_act = self.get_activation(theta_act)
-        
+
         ## define the word embedding matrix \rho
         if train_embeddings:
             self.rho = nn.Linear(rho_size, vocab_size, bias=False)
@@ -37,15 +38,15 @@ class ETM(nn.Module):
 
         ## define the matrix containing the topic embeddings
         self.alphas = nn.Linear(rho_size, num_topics, bias=False)
-    
+
         ## define variational distribution for \theta_{1:D} via amortizartion
         print(vocab_size, " THE Vocabulary size is here ")
         self.q_theta = nn.Sequential(
-                nn.Linear(vocab_size, t_hidden_size), 
-                self.theta_act,
-                nn.Linear(t_hidden_size, t_hidden_size),
-                self.theta_act,
-            )
+            nn.Linear(vocab_size, t_hidden_size),
+            self.theta_act,
+            nn.Linear(t_hidden_size, t_hidden_size),
+            self.theta_act,
+        )
         self.mu_q_theta = nn.Linear(t_hidden_size, num_topics, bias=True)
         self.logsigma_q_theta = nn.Linear(t_hidden_size, num_topics, bias=True)
 
@@ -69,13 +70,13 @@ class ETM(nn.Module):
         else:
             print('Defaulting to tanh activations...')
             act = nn.Tanh()
-        return act 
+        return act
 
     def reparameterize(self, mu, logvar):
         """Returns a sample from a Gaussian distribution via reparameterization.
         """
         if self.training:
-            std = torch.exp(0.5 * logvar) 
+            std = torch.exp(0.5 * logvar)
             eps = torch.randn_like(std)
             return eps.mul_(std).add_(mu)
         else:
@@ -104,10 +105,10 @@ class ETM(nn.Module):
             [type]: [description]
         """
         try:
-            logit = self.alphas(self.rho.weight) # torch.mm(self.rho, self.alphas)
+            logit = self.alphas(self.rho.weight)  # torch.mm(self.rho, self.alphas)
         except:
             logit = self.alphas(self.rho)
-        beta = F.softmax(logit, dim=0).transpose(1, 0) ## softmax over vocab dimension
+        beta = F.softmax(logit, dim=0).transpose(1, 0)  ## softmax over vocab dimension
         return beta
 
     def get_theta(self, normalized_bows):
@@ -115,7 +116,7 @@ class ETM(nn.Module):
         getting the topic poportion for the document passed in the normalixe bow or tf-idf"""
         mu_theta, logsigma_theta, kld_theta = self.encode(normalized_bows)
         z = self.reparameterize(mu_theta, logsigma_theta)
-        theta = F.softmax(z, dim=-1) 
+        theta = F.softmax(z, dim=-1)
         return theta, kld_theta
 
     def decode(self, theta, beta):
@@ -174,7 +175,6 @@ class ETM(nn.Module):
         self.optimizer = optimizer
         return optimizer
 
-
     def train_for_epoch(self, epoch, args, training_set):
         """
         train the model for the given epoch 
@@ -206,30 +206,30 @@ class ETM(nn.Module):
             acc_kl_theta_loss += torch.sum(kld_theta).item()
             cnt += 1
             if idx % args.log_interval == 0 and idx > 0:
-                cur_loss = round(acc_loss / cnt, 2) 
-                cur_kl_theta = round(acc_kl_theta_loss / cnt, 2) 
+                cur_loss = round(acc_loss / cnt, 2)
+                cur_kl_theta = round(acc_kl_theta_loss / cnt, 2)
                 cur_real_loss = round(cur_loss + cur_kl_theta, 2)
 
                 print('Epoch: {} .. batch: {}/{} .. LR: {} .. KL_theta: {} .. Rec_loss: {} .. NELBO: {}'.format(
-                    epoch, idx, len(indices), self.optimizer.param_groups[0]['lr'], cur_kl_theta, cur_loss, cur_real_loss))
+                    epoch, idx, len(indices), self.optimizer.param_groups[0]['lr'], cur_kl_theta, cur_loss,
+                    cur_real_loss))
 
-        cur_loss = round(acc_loss / cnt, 2) 
-        cur_kl_theta = round(acc_kl_theta_loss / cnt, 2) 
+        cur_loss = round(acc_loss / cnt, 2)
+        cur_kl_theta = round(acc_kl_theta_loss / cnt, 2)
         cur_real_loss = round(cur_loss + cur_kl_theta, 2)
-        print('*'*100)
+        print('*' * 100)
         print('Epoch----->{} .. LR: {} .. KL_theta: {} .. Rec_loss: {} .. NELBO: {}'.format(
-                epoch, self.optimizer.param_groups[0]['lr'], cur_kl_theta, cur_loss, cur_real_loss))
-        print('*'*100)
+            epoch, self.optimizer.param_groups[0]['lr'], cur_kl_theta, cur_loss, cur_real_loss))
+        print('*' * 100)
 
-    
     def visualize(self, args, vocabulary, show_emb=False):
         Path.cwd().joinpath("results").mkdir(parents=True, exist_ok=True)
         self.eval()
-        model_path = Path.home().joinpath("Projects", 
-                                        "Personal", 
-                                        "balobi_nini", 
-                                        'models', 
-                                        'embeddings_one_gram_fast_tweets_only').__str__()
+        model_path = Path.home().joinpath("Projects",
+                                          "Personal",
+                                          "balobi_nini",
+                                          'models',
+                                          'embeddings_one_gram_fast_tweets_only').__str__()
         model_gensim = FT_gensim.load(model_path)
 
         # need to update this .. 
@@ -239,36 +239,35 @@ class ETM(nn.Module):
         results_file_name = "topic_results_{}_{}.txt".format(args.batch_size, args.epochs)
         results_file_name = Path.cwd().joinpath("results", results_file_name)
         with torch.no_grad():
-            print('#'*100)
+            print('#' * 100)
             print('Visualize topics...')
             topics_words = []
             gammas = self.get_beta()
             for k in range(args.num_topics):
                 gamma = gammas[k]
-                top_words = list(gamma.cpu().numpy().argsort()[-args.num_words+1:][::-1])
+                top_words = list(gamma.cpu().numpy().argsort()[-args.num_words + 1:][::-1])
                 topic_words = [vocabulary[a].strip() for a in top_words]
                 topics_words.append(' '.join(topic_words))
                 with open(results_file_name, "a") as results_file:
-	                results_file.write('Topic {}: {}\n'.format(k, topic_words))
+                    results_file.write('Topic {}: {}\n'.format(k, topic_words))
             with open(results_file_name, "a") as results_file:
-	            results_file.write(10*'#'+'\n') # But this could have been done as a function
+                results_file.write(10 * '#' + '\n')  # But this could have been done as a function
 
             if show_emb:
                 ## visualize word embeddings by using V to get nearest neighbors
-                print('#'*100)
+                print('#' * 100)
                 print('Visualize word embeddings by using output embedding matrix')
                 try:
                     embeddings = self.rho.weight  # Vocab_size x E
                 except:
-                    embeddings = self.rho         # Vocab_size x E
+                    embeddings = self.rho  # Vocab_size x E
                 neighbors = []
                 for word in queries:
                     print('word: {} .. neighbors: {}'.format(
                         word, nearest_neighbors(model_gensim, word)))
-                print('#'*100)
+                print('#' * 100)
 
-
-    def evaluate(self, args, source, training_set, vocabulary , test_1, test_2, tc=False, td=False):
+    def evaluate(self, args, source, training_set, vocabulary, test_1, test_2, tc=False, td=False):
         """
         Compute perplexity on document completion.
         """
@@ -276,7 +275,7 @@ class ETM(nn.Module):
         with torch.no_grad():
             if source == 'val':
                 indices = torch.split(torch.tensor(range(args.num_docs_valid)), args.eval_batch_size)
-            else: 
+            else:
                 indices = torch.split(torch.tensor(range(args.num_docs_test)), args.eval_batch_size)
 
             ## get \beta here
@@ -306,9 +305,9 @@ class ETM(nn.Module):
                 cnt += 1
             cur_loss = acc_loss / cnt
             ppl_dc = round(math.exp(cur_loss), 1)
-            print('*'*100)
+            print('*' * 100)
             print('{} Doc Completion PPL: {}'.format(source.upper(), ppl_dc))
-            print('*'*100)
+            print('*' * 100)
             if tc or td:
                 beta = beta.data.cpu().numpy()
                 if tc:
